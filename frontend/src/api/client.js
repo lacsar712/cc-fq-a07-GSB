@@ -62,4 +62,9 @@ export async function createJob(body) {
   return data
 }
 
+export async function diffJobs(baseJobId, targetJobId) {
+  const { data } = await api.post('/jobs/diff', { baseJobId, targetJobId })
+  return data
+}
+
 export default api

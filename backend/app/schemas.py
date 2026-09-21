@@ -77,3 +77,51 @@ class JobListItem(BaseModel):
 class HealthOut(BaseModel):
     status: str
     service: str
+
+
+class JobDiffRequest(BaseModel):
+    baseJobId: int
+    targetJobId: int
+
+    model_config = {"populate_by_name": True}
+
+
+class DiffJobBrief(BaseModel):
+    id: int
+    sample_name: str
+    status: str
+    created_by: str
+    error_message: str | None
+    created_at: datetime
+    finished_at: datetime | None
+
+
+class MetricDiffOut(BaseModel):
+    key: str
+    label: str
+    base_value: float | int | None
+    target_value: float | int | None
+    base_missing: bool
+    target_missing: bool
+    delta: float | int | None
+    same: bool
+
+
+class StageDiffOut(BaseModel):
+    stage_order: int
+    actor_name: str
+    base_status: str | None
+    target_status: str | None
+    base_missing: bool
+    target_missing: bool
+    same: bool
+
+
+class JobDiffOut(BaseModel):
+    base: DiffJobBrief
+    target: DiffJobBrief
+    status_same: bool
+    metrics_same: bool
+    stages_same: bool
+    metric_diffs: list[MetricDiffOut]
+    stage_diffs: list[StageDiffOut]

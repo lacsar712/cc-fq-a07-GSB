@@ -3,11 +3,14 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.auth import authenticate_user, create_access_token, get_current_user, require_bioops
 from app.database import SessionLocal, get_db
+from app.diff import build_job_diff, load_jobs_for_diff
 from app.models import Job, JobStage, Sample
 from app.pipeline.runner import create_job_stages, run_pipeline_sync
 from app.schemas import (
     HealthOut,
     JobCreate,
+    JobDiffOut,
+    JobDiffRequest,
     JobListItem,
     JobOut,
     LoginRequest,
@@ -99,6 +102,29 @@ def create_job(
 @router.get("/jobs", response_model=list[JobListItem])
 def list_jobs(_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     return db.query(Job).order_by(Job.id.desc()).all()
+
+
+@router.post("/jobs/diff", response_model=JobDiffOut)
+def diff_jobs(
+    body: JobDiffRequest,
+    _user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Server-side diff of two jobs.
+
+    Read-only and available to any authenticated user (incl. auditor); it never
+    creates a job. All deltas/status comparisons are computed here — the client
+    is not trusted to subtract two detail payloads.
+    """
+    if body.baseJobId == body.targetJobId:
+        raise HTTPException(status_code=400, detail="请选择两条不同的作业进行差分")
+    try:
+        base, base_stages, target, target_stages = load_jobs_for_diff(
+            db, body.baseJobId, body.targetJobId
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=f"作业不存在: #{exc.args[0]}") from exc
+    return build_job_diff(base, target, base_stages, target_stages)
 
 
 @router.get("/jobs/{job_id}", response_model=JobOut)

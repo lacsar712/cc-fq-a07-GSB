@@ -3,6 +3,15 @@
     <div class="row items-center q-mb-md">
       <div class="text-h5">作业历史</div>
       <q-space />
+      <q-btn
+        flat
+        color="primary"
+        icon="difference"
+        :label="`差分所选（${selected.length}/2）`"
+        :disable="selected.length !== 2"
+        class="q-mr-sm"
+        @click="goDiff"
+      />
       <q-btn flat icon="refresh" label="刷新" @click="load" :loading="loading" />
       <q-btn
         v-if="auth.role === 'bioops'"
@@ -17,11 +26,14 @@
       flat
       bordered
       row-key="id"
+      selection="multiple"
+      v-model:selected="selected"
       :rows="rows"
       :columns="columns"
       :loading="loading"
       hide-pagination
       :pagination="{ rowsPerPage: 0 }"
+      @update:selected="onSelection"
     >
       <template #body-cell-status="props">
         <q-td :props="props">
@@ -51,14 +63,35 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { listJobs } from '../api/client'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
+const router = useRouter()
 const $q = useQuasar()
 const loading = ref(false)
 const rows = ref([])
+const selected = ref([])
+
+function onSelection(rowsPicked) {
+  // Diff is strictly two jobs: keep only the latest two picks.
+  if (rowsPicked.length > 2) {
+    selected.value = rowsPicked.slice(-2)
+  } else {
+    selected.value = rowsPicked
+  }
+}
+
+function goDiff() {
+  if (selected.value.length !== 2) {
+    $q.notify({ type: 'warning', message: '请勾选两条作业进行差分' })
+    return
+  }
+  const [a, b] = selected.value
+  router.push({ path: '/jobs/diff', query: { base: a.id, target: b.id } })
+}
 
 const columns = [
   { name: 'id', label: 'ID', field: 'id', align: 'left' },
