@@ -3,6 +3,14 @@
     <div class="row items-center q-mb-md">
       <div class="text-h5">作业历史</div>
       <q-space />
+      <q-btn
+        color="deep-purple"
+        icon="difference"
+        class="q-mr-sm"
+        :label="`差分选中（${selected.length}/2）`"
+        :disable="selected.length !== 2"
+        @click="goDiff"
+      />
       <q-btn flat icon="refresh" label="刷新" @click="load" :loading="loading" />
       <q-btn
         v-if="auth.role === 'bioops'"
@@ -13,6 +21,10 @@
       />
     </div>
 
+    <div v-if="auth.role === 'auditor'" class="text-caption text-grey-7 q-mb-sm">
+      审计员为只读角色：可勾选两条作业进行差分，但不能提交新作业。
+    </div>
+
     <q-table
       flat
       bordered
@@ -20,6 +32,9 @@
       :rows="rows"
       :columns="columns"
       :loading="loading"
+      selection="multiple"
+      :selected="selected"
+      @update:selected="onSelectionUpdate"
       hide-pagination
       :pagination="{ rowsPerPage: 0 }"
     >
@@ -51,14 +66,17 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { listJobs } from '../api/client'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
+const router = useRouter()
 const $q = useQuasar()
 const loading = ref(false)
 const rows = ref([])
+const selected = ref([])
 
 const columns = [
   { name: 'id', label: 'ID', field: 'id', align: 'left' },
@@ -76,6 +94,21 @@ const columns = [
   { name: 'actions', label: '操作', field: 'actions', align: 'left' },
 ]
 
+function onSelectionUpdate(val) {
+  if (val.length > 2) {
+    // Reject the (de)selection beyond two rows; :selected stays at two.
+    $q.notify({ type: 'warning', message: '差分最多选择两条作业' })
+    return
+  }
+  selected.value = val.slice()
+}
+
+function goDiff() {
+  if (selected.value.length !== 2) return
+  const [a, b] = selected.value
+  router.push({ path: '/jobs/diff', query: { a: a.id, b: b.id } })
+}
+
 function statusLabel(s) {
   return { pending: '排队中', running: '运行中', success: '成功', failed: '失败' }[s] || s
 }
@@ -88,6 +121,7 @@ async function load() {
   loading.value = true
   try {
     rows.value = await listJobs()
+    selected.value = []
   } catch (e) {
     $q.notify({ type: 'negative', message: e.message || '加载失败' })
   } finally {

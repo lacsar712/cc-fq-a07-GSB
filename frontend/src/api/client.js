@@ -62,4 +62,11 @@ export async function createJob(body) {
   return data
 }
 
+// Server-side diff: verdict / metric deltas / stage table are computed by the
+// backend. Never reimplement this by subtracting two getJob() payloads here.
+export async function diffJobs(a, b) {
+  const { data } = await api.get('/jobs/diff', { params: { a, b } })
+  return data
+}
+
 export default api

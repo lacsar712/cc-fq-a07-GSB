@@ -12,3 +12,12 @@ body {
 .metric-card .q-card__section {
   min-height: 88px;
 }
+
+/* Diff tables: highlight rows where the two jobs disagree. */
+.diff-table tbody tr.row-mismatch {
+  background: #fdecea;
+}
+
+.diff-table tbody tr.row-mismatch td {
+  border-color: #f5c6c0;
+}

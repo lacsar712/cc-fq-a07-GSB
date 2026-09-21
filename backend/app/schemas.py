@@ -77,3 +77,41 @@ class JobListItem(BaseModel):
 class HealthOut(BaseModel):
     status: str
     service: str
+
+
+class DiffJobRef(BaseModel):
+    id: int
+    sample_name: str
+    status: str
+    created_by: str
+
+
+class MetricDiffItem(BaseModel):
+    key: str
+    label: str
+    value_a: Any | None
+    value_b: Any | None
+    present_a: bool
+    present_b: bool
+    both_missing: bool
+    delta: int | float | None
+    equal: bool
+
+
+class StageDiffItem(BaseModel):
+    stage_order: int
+    actor_name: str
+    status_a: str | None
+    status_b: str | None
+    missing_a: bool
+    missing_b: bool
+    equal: bool
+
+
+class JobDiffOut(BaseModel):
+    job_a: DiffJobRef
+    job_b: DiffJobRef
+    status_equal: bool
+    all_equal: bool
+    metrics: list[MetricDiffItem]
+    stages: list[StageDiffItem]

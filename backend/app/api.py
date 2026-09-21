@@ -1,13 +1,15 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth import authenticate_user, create_access_token, get_current_user, require_bioops
 from app.database import SessionLocal, get_db
+from app.diff import build_job_diff
 from app.models import Job, JobStage, Sample
 from app.pipeline.runner import create_job_stages, run_pipeline_sync
 from app.schemas import (
     HealthOut,
     JobCreate,
+    JobDiffOut,
     JobListItem,
     JobOut,
     LoginRequest,
@@ -99,6 +101,42 @@ def create_job(
 @router.get("/jobs", response_model=list[JobListItem])
 def list_jobs(_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     return db.query(Job).order_by(Job.id.desc()).all()
+
+
+def _load_job_with_stages(db: Session, job_id: int) -> Job | None:
+    return (
+        db.query(Job)
+        .options(joinedload(Job.stages))
+        .filter(Job.id == job_id)
+        .first()
+    )
+
+
+@router.get("/jobs/diff", response_model=JobDiffOut)
+def diff_jobs(
+    a: int = Query(..., description="作业 A 的 ID"),
+    b: int = Query(..., description="作业 B 的 ID"),
+    _user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Server-side comparison of two jobs.
+
+    Read-only for every authenticated role (auditors included); it never
+    creates or mutates jobs. The status verdict, metric deltas, missing-metric
+    flags and the four-stage status table are all computed on the server.
+    """
+    if a == b:
+        raise HTTPException(status_code=400, detail="请选择两条不同的作业进行差分")
+
+    job_a = _load_job_with_stages(db, a)
+    job_b = _load_job_with_stages(db, b)
+    missing = [str(jid) for jid, job in ((a, job_a), (b, job_b)) if not job]
+    if missing:
+        raise HTTPException(
+            status_code=404, detail=f"作业不存在: {', '.join(missing)}"
+        )
+
+    return build_job_diff(job_a, job_b, list(job_a.stages), list(job_b.stages))
 
 
 @router.get("/jobs/{job_id}", response_model=JobOut)
